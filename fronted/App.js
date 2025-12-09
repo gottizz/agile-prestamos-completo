@@ -724,56 +724,62 @@ async function crearPrestamo() {
         return;
     }
 
-    const monto = parseFloat(document.getElementById('monto-prestamo').value);
+    // Obtener valores del nuevo formulario
+    const montoPrestado = parseFloat(document.getElementById('monto-prestado').value);
+    const interes = parseFloat(document.getElementById('tasa-interes').value) || 0;
     const cuotas = parseInt(document.getElementById('num-cuotas').value);
-    const mensajeDiv = document.getElementById('mensaje-prestamo');
+    const frecuencia = document.getElementById('frecuencia-pago').value;
+    const fechaInicio = document.getElementById('fecha-inicio').value; // Puede estar vacío
 
+    const mensajeDiv = document.getElementById('mensaje-prestamo');
     mensajeDiv.className = 'mensaje';
     mensajeDiv.innerText = '';
 
-    if (!monto || !cuotas) {
-        mostrarToast('Complete todos los campos', 'warning');
+    // Validaciones
+    if (!montoPrestado || montoPrestado <= 0) {
+        mostrarToast('Ingrese un monto válido a prestar', 'warning');
+        return;
+    }
+    if (!cuotas || cuotas <= 0) {
+        mostrarToast('Ingrese el número de cuotas', 'warning');
         return;
     }
 
-    if (monto > 20000) {
-        mostrarToast('El monto máximo es S/ 20,000', 'error');
-        return;
-    }
-
-    if (cuotas > 24) {
-        mostrarToast('El número máximo de cuotas es 24', 'error');
-        return;
-    }
-
-    mensajeDiv.innerText = '⏳ Creando préstamo...';
+    mensajeDiv.innerText = '⏳ Calculando y creando préstamo...';
 
     try {
+        // Enviamos los datos con los nombres que definimos en el Backend nuevo
+        const payload = {
+            cliente_id: clienteSeleccionado.id,
+            monto_prestado: montoPrestado,
+            interes_porcentaje: interes,
+            num_cuotas: cuotas,
+            frecuencia: frecuencia,
+            fecha_inicio: fechaInicio || undefined // Si está vacío, no lo enviamos (el backend usa hoy)
+        };
+
         const res = await fetch(`${API_URL}/prestamos`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                cliente_id: clienteSeleccionado.id,
-                monto_total: monto,
-                num_cuotas: cuotas
-            })
+            body: JSON.stringify(payload)
         });
 
         const data = await res.json();
 
         if (res.ok) {
-            mensajeDiv.innerText = `✅ Préstamo creado exitosamente. ID: ${data.prestamo_id}`;
+            mensajeDiv.innerText = `✅ Préstamo creado exitosamente. Total a cobrar: S/ ${data.total_a_pagar}`;
             mensajeDiv.classList.add('exito');
 
             // Limpiar formulario
-            document.getElementById('monto-prestamo').value = '';
+            document.getElementById('monto-prestado').value = '';
             document.getElementById('num-cuotas').value = '';
             document.getElementById('buscar-cliente-doc').value = '';
             document.getElementById('info-cliente').style.display = 'none';
             document.getElementById('form-prestamo').style.display = 'none';
+            document.getElementById('resumen-calculo').style.display = 'none';
 
-            // Mostrar detalle del préstamo creado
-            setTimeout(() => mostrarDetallePrestamo(clienteSeleccionado.id, data), 2000);
+            // Mostrar detalle
+            setTimeout(() => mostrarDetallePrestamo(clienteSeleccionado.id, data), 1500);
 
         } else {
             mensajeDiv.innerText = `❌ Error: ${data.error}`;
@@ -786,7 +792,8 @@ async function crearPrestamo() {
     }
 }
 
-async function mostrarDetallePrestamo(clienteId, prestamoData) {
+// REEMPLAZA LA FUNCIÓN mostrarDetallePrestamo() EXISTENTE
+async function mostrarDetallePrestamo(clienteId) {
     try {
         const res = await fetch(`${API_URL}/prestamos/cliente/${clienteId}`);
         const data = await res.json();
@@ -794,16 +801,37 @@ async function mostrarDetallePrestamo(clienteId, prestamoData) {
         if (res.ok) {
             const { prestamo, cuotas } = data;
 
-            // Mostrar información del préstamo
+            // Mostrar información del préstamo (Diseño mejorado)
             document.getElementById('detalle-prestamo-info').innerHTML = `
-                <p><strong>Cliente:</strong> ${prestamo.cliente_nombre || 'N/A'}</p>
-                <p><strong>Monto Total:</strong> S/ ${prestamo.monto_total}</p>
-                <p><strong>Número de Cuotas:</strong> ${prestamo.num_cuotas}</p>
-                <p><strong>Monto por Cuota:</strong> S/ ${prestamo.monto_por_cuota}</p>
-                <p><strong>Fecha Inicio:</strong> ${prestamo.fecha_inicio}</p>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.95em;">
+                    <div style="background: #f8f9fa; padding: 10px; border-radius: 5px;">
+                        <small style="color: #666;">Cliente</small><br>
+                        <strong>${prestamo.cliente_nombre || 'N/A'}</strong>
+                    </div>
+                    <div style="background: #e3f2fd; padding: 10px; border-radius: 5px;">
+                        <small style="color: #1565c0;">Capital Prestado</small><br>
+                        <strong style="color: #1565c0;">S/ ${prestamo.monto_prestado}</strong>
+                    </div>
+                    <div>
+                        <small style="color: #666;">Total a Pagar (Capital + ${prestamo.interes_porcentaje}%)</small><br>
+                        <strong>S/ ${prestamo.monto_total}</strong>
+                    </div>
+                    <div>
+                        <small style="color: #666;">Frecuencia</small><br>
+                        <strong>${prestamo.frecuencia}</strong> (${prestamo.num_cuotas} cuotas)
+                    </div>
+                    <div>
+                        <small style="color: #666;">Fecha Inicio</small><br>
+                        ${prestamo.fecha_inicio}
+                    </div>
+                    <div>
+                        <small style="color: #666;">Estado</small><br>
+                        <span style="padding: 2px 8px; border-radius: 10px; background: #e8f5e9; color: #2e7d32; font-size: 0.85em;">ACTIVO</span>
+                    </div>
+                </div>
             `;
 
-            // Mostrar cronograma de cuotas CON RESALTADO PARA VENCIDAS
+            // Mostrar cronograma de cuotas
             const tablaCuotas = document.getElementById('tabla-cuotas');
             tablaCuotas.innerHTML = '';
 
@@ -820,31 +848,32 @@ async function mostrarDetallePrestamo(clienteId, prestamoData) {
                 }
 
                 const esParcial = !cuota.pagada && cuota.saldo_pendiente < cuota.monto_cuota;
-                const porcentajePagado = esParcial ? Math.round(((cuota.monto_cuota - cuota.saldo_pendiente) / cuota.monto_cuota) * 100) : 0;
 
                 const estado = cuota.pagada ?
                     '<span class="badge-pagada">✅ Pagada</span>' :
                     vencida ?
                         `<span class="badge-vencida">🔴 VENCIDA (${diasAtraso}d)</span>` :
                         esParcial ?
-                            `<span class="badge-pendiente" style="background:#e67e22; color:white;">📉 Pendiente (Falta S/ ${cuota.saldo_pendiente.toFixed(2)})</span>` :
+                            `<span class="badge-pendiente" style="background:#e67e22; color:white;">📉 Pendiente (Saldo S/ ${cuota.saldo_pendiente.toFixed(2)})</span>` :
                             '<span class="badge-pendiente">⏳ Pendiente</span>';
 
                 const row = document.createElement('tr');
-                if (vencida) {
-                    row.className = 'cuota-vencida';
-                }
+                if (vencida) row.className = 'cuota-vencida';
+
+                // Formatear fecha para que se vea mejor (DD/MM/YYYY)
+                const fechaParts = cuota.fecha_vencimiento.split('-');
+                const fechaFormat = `${fechaParts[2]}/${fechaParts[1]}`;
 
                 row.innerHTML = `
                     <td>${cuota.numero_cuota}</td>
-                    <td>${cuota.fecha_vencimiento}</td>
+                    <td>${fechaFormat}</td>
                     <td>S/ ${cuota.monto_cuota}</td>
-                    <td>S/ ${cuota.saldo_pendiente}</td>
+                    <td style="font-weight: bold;">S/ ${cuota.saldo_pendiente}</td>
                     <td>${estado}</td>
                     <td>
-                        <button class="btn-small" style="background: #3498db; padding: 2px 5px; font-size: 0.8em;" 
-                            onclick="verHistorial('${cuota.id}', ${cuota.numero_cuota}, '${prestamo.cliente_nombre}', '${prestamo.cliente_documento}')">
-                            📜 Historial
+                         <button class="btn-small" style="background: #3498db; padding: 4px 8px; font-size: 0.8em;" 
+                            onclick="verHistorial('${cuota.id}', ${cuota.numero_cuota}, '${prestamo.cliente_nombre}', '')">
+                            📜
                         </button>
                     </td>
                 `;
@@ -855,9 +884,9 @@ async function mostrarDetallePrestamo(clienteId, prestamoData) {
         }
     } catch (error) {
         console.error(error);
+        mostrarToast('Error cargando detalles del préstamo', 'error');
     }
 }
-
 function ocultarDetallePrestamo() {
     document.getElementById('detalle-prestamo-card').style.display = 'none';
 }
@@ -2433,3 +2462,27 @@ mostrarSeccion = function (id) {
     if (id === 'empleados') cargarEmpleados();
     if (id === 'config') cargarConfiguracion();
 };
+// Agregar al final de App.js
+document.addEventListener('input', function (e) {
+    if (e.target.id === 'monto-prestado' || e.target.id === 'tasa-interes' || e.target.id === 'num-cuotas') {
+        calcularResumenPrestamo();
+    }
+});
+
+function calcularResumenPrestamo() {
+    const monto = parseFloat(document.getElementById('monto-prestado').value) || 0;
+    const interes = parseFloat(document.getElementById('tasa-interes').value) || 0;
+    const cuotas = parseInt(document.getElementById('num-cuotas').value) || 1;
+    const divResumen = document.getElementById('resumen-calculo');
+
+    if (monto > 0) {
+        const total = monto * (1 + (interes / 100));
+        const cuota = total / cuotas;
+
+        document.getElementById('calc-total').innerText = `S/ ${total.toFixed(2)}`;
+        document.getElementById('calc-cuota').innerText = `S/ ${cuota.toFixed(2)}`;
+        divResumen.style.display = 'block';
+    } else {
+        divResumen.style.display = 'none';
+    }
+}
