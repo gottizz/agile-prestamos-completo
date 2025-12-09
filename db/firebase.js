@@ -1,35 +1,44 @@
 const admin = require('firebase-admin');
 
-// Configuración usando variables de entorno (Render/Producción)
-// El archivo serviceAccountKey.json NO existe en producción
-let serviceAccount;
+// 1. Evitar inicializar Firebase más de una vez
+if (!admin.apps.length) {
 
-if (process.env.FIREBASE_PRIVATE_KEY) {
-  // Producción: usar variables de entorno
-  serviceAccount = {
-    projectId: process.env.FIREBASE_PROJECT_ID,
-    privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-    clientEmail: process.env.FIREBASE_CLIENT_EMAIL
-  };
-  console.log('🔥 Firebase: Usando variables de entorno');
-} else {
-  // Desarrollo local: usar archivo JSON
-  try {
-    serviceAccount = require('../serviceAccountKey.json');
-    console.log('🔥 Firebase: Usando serviceAccountKey.json');
-  } catch (e) {
-    console.error('❌ ERROR: No se encontraron credenciales de Firebase.');
-    console.error('Para desarrollo local: Agrega serviceAccountKey.json');
-    console.error('Para producción: Configura FIREBASE_PRIVATE_KEY, FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL');
-    process.exit(1);
+  // 2. LÓGICA PARA PRODUCCIÓN (VERCEL)
+  // Utiliza variables de entorno que configuraste en Vercel
+  if (process.env.FIREBASE_PRIVATE_KEY) {
+    console.log("🔥 Inicializando Firebase con Variables de Entorno (Producción)");
+    try {
+      admin.initializeApp({
+        credential: admin.credential.cert({
+          projectId: process.env.FIREBASE_PROJECT_ID,
+          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+
+          // 🚨 SOLUCIÓN CRÍTICA: Reemplaza los saltos de línea (\n)
+          // que Vercel rompe en la clave privada.
+          privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
+        })
+      });
+    } catch (error) {
+      console.error("❌ Error al inicializar Firebase con Vercel ENV:", error.message);
+    }
+  }
+
+  // 3. LÓGICA PARA ENTORNO LOCAL (Desarrollo)
+  // Intenta leer el archivo serviceAccountKey.json
+  else {
+    try {
+      const serviceAccount = require('../serviceAccountKey.json'); // Ajusta la ruta si es necesario
+      console.log("🔥 Inicializando Firebase con Archivo Local (Desarrollo)");
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount)
+      });
+    } catch (e) {
+      // Esto es normal si el archivo no existe en producción
+      console.error("❌ Error al inicializar Firebase. No se encontró serviceAccountKey.json ni variables de entorno.");
+    }
   }
 }
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
-});
-
+// Exportar la instancia de Firestore
 const db = admin.firestore();
-console.log("✅ Base de datos Firebase conectada");
-
 module.exports = db;
