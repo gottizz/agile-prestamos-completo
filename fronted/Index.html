@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agile Préstamos - Sistema de Cobranzas</title>
+    <link rel="stylesheet" href="Style.css">
+    <!-- jsPDF para generar comprobantes PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+
+<body>
+    <!-- TOAST CONTAINER -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- PANTALLA DE LOGIN -->
+    <div id="pantalla-login" class="login-overlay" style="display: flex;">
+        <div class="login-card">
+            <h1>🏦 AGILE Préstamos</h1>
+            <h3>Sistema de Cobranzas</h3>
+            <p style="color: #7f8c8d; margin-bottom: 30px;">Inicio de Sesión - Cajero</p>
+
+            <div class="form-group">
+                <label>Usuario:</label>
+                <input type="text" id="login-usuario" placeholder="Ingrese su usuario" value="cajero">
+            </div>
+
+            <div class="form-group">
+                <label>Contraseña:</label>
+                <input type="password" id="login-password" placeholder="Ingrese su contraseña" value="123">
+            </div>
+
+            <div id="login-mensaje" style="color: #e74c3c; text-align: center; margin: 10px 0;"></div>
+
+            <button class="btn-secondary" style="width: 100%; padding: 12px;" onclick="iniciarSesion()">
+                🔐 Iniciar Sesión
+            </button>
+
+            <small style="display: block; text-align: center; margin-top: 15px; color: #95a5a6;">
+                Usuario demo: <strong>cajero</strong> / Contraseña: <strong>123</strong>
+            </small>
+        </div>
+    </div>
+
+    <!-- APLICACIÓN PRINCIPAL -->
+    <div id="app-principal" class="app-layout" style="display: none;">
+
+        <!-- SIDEBAR -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>💰 CAPITAL RISE</h2>
+                <span>LOANS</span>
+            </div>
+
+            <nav class="sidebar-nav">
+                <button class="nav-item active" onclick="mostrarSeccion('dashboard')">
+                    <span class="nav-icon">📊</span>
+                    <span>Dashboard</span>
+                </button>
+                <button class="nav-item" onclick="mostrarSeccion('clientes')">
+                    <span class="nav-icon">👥</span>
+                    <span>Clientes</span>
+                </button>
+                <button class="nav-item" onclick="mostrarSeccion('prestamos')">
+                    <span class="nav-icon">💵</span>
+                    <span>Préstamos</span>
+                </button>
+                <button class="nav-item" onclick="mostrarSeccion('pagos')">
+                    <span class="nav-icon">💳</span>
+                    <span>Cobranza</span>
+                </button>
+                <button class="nav-item" onclick="mostrarCaja()">
+                    <span class="nav-icon">🏦</span>
+                    <span>Caja</span>
+                </button>
+                <button class="nav-item" onclick="mostrarSeccion('calendario')">
+                    <span class="nav-icon">📅</span>
+                    <span>Calendario</span>
+                </button>
+                <button class="nav-item btn-admin" onclick="mostrarSeccion('empleados')">
+                    <span class="nav-icon">👤</span>
+                    <span>Empleados</span>
+                </button>
+                <button class="nav-item btn-admin" onclick="mostrarSeccion('config')">
+                    <span class="nav-icon">⚙️</span>
+                    <span>Configuración</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <div class="user-avatar" id="user-avatar">C</div>
+                    <div>
+                        <div class="user-name" id="sidebar-user-name">Cajero</div>
+                        <div class="user-role" id="sidebar-user-role">Operador</div>
+                    </div>
+                </div>
+                <button class="btn-logout" onclick="cerrarSesion()">🚪 Cerrar Sesión</button>
+            </div>
+        </aside>
+
+        <!-- CONTENIDO PRINCIPAL -->
+        <main class="main-content">
+            <!-- HEADER -->
+            <div class="content-header">
+                <h1 id="page-title">Dashboard</h1>
+                <div class="header-actions">
+                    <!-- Fecha -->
+                    <span class="header-date" id="header-date"></span>
+                </div>
+            </div>
+
+            <!-- SECCIÓN DASHBOARD (NUEVA) -->
+            <div id="seccion-dashboard" class="seccion" style="display: block;">
+                <!-- Estadísticas -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">👥</div>
+                        <div class="stat-value" id="stat-clientes">0</div>
+                        <div class="stat-label">Clientes Registrados</div>
+                    </div>
+                    <div class="stat-card success">
+                        <div class="stat-icon">💵</div>
+                        <div class="stat-value" id="stat-prestamos">0</div>
+                        <div class="stat-label">Préstamos Activos</div>
+                    </div>
+                    <div class="stat-card accent">
+                        <div class="stat-icon">💰</div>
+                        <div class="stat-value" id="stat-cobrado">S/ 0</div>
+                        <div class="stat-label">Cobrado Hoy</div>
+                    </div>
+                    <div class="stat-card danger">
+                        <div class="stat-icon">⚠️</div>
+                        <div class="stat-value" id="stat-morosos">0</div>
+                        <div class="stat-label">Clientes Morosos</div>
+                    </div>
+                </div>
+
+                <!-- Alertas de cuotas vencidas -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>⚠️ Cuotas Vencidas Hoy</h3>
+                        <button class="btn-small" onclick="mostrarSeccion('pagos')">Ver Todas</button>
+                    </div>
+                    <div class="card-body">
+                        <div id="lista-cuotas-vencidas">
+                            <p style="text-align: center; color: var(--text-muted);">Cargando...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Accesos rápidos -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>🚀 Acciones Rápidas</h3>
+                    </div>
+                    <div class="card-body" style="display: flex; gap: 15px; flex-wrap: wrap;">
+                        <button class="btn-primary" onclick="mostrarSeccion('clientes')">➕ Nuevo Cliente</button>
+                        <button class="btn-secondary" onclick="mostrarSeccion('prestamos')">💵 Nuevo Préstamo</button>
+                        <button class="btn-small" onclick="mostrarSeccion('pagos')">💳 Registrar Pago</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECCIÓN CLIENTES -->
+            <div id="seccion-clientes" class="seccion">
+
+                <!-- Estadísticas de Filtro (Oculto por defecto) -->
+                <div id="stats-morosos" class="filter-stats" style="display: none;">
+                    <span>⚠️ Mostrando solo clientes con cuotas vencidas</span>
+                    <span id="total-mora-acumulada">Total Mora: S/ 0.00</span>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3>➕ Registrar Nuevo Cliente</h3>
+                    </div>
+                    <div class="card-body">
+                        <!-- Fila 1: Tipo y Número de Documento -->
+                        <div class="form-row">
+                            <div class="form-group" style="flex: 1;">
+                                <label>Tipo de Documento: <span class="required">*</span></label>
+                                <select id="tipo" onchange="actualizarMaxLengthDocumento()">
+                                    <option value="DNI">DNI (8 dígitos)</option>
+                                    <option value="RUC">RUC (11 dígitos)</option>
+                                    <option value="PASAPORTE">Pasaporte</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="flex: 2;">
+                                <label>Número de Documento: <span class="required">*</span></label>
+                                <div class="input-group">
+                                    <input type="text" id="documento" placeholder="Ingrese el número" maxlength="8"
+                                        oninput="validarDocumento()" onblur="buscarDatosCliente()">
+                                    <button type="button" class="btn-small" onclick="buscarDatosCliente()"
+                                        style="margin-left: 5px; padding: 8px 15px;">
+                                        🔍 Buscar Datos
+                                    </button>
+                                    <span id="doc-validacion" class="validation-icon"></span>
+                                </div>
+                                <small id="doc-mensaje">DNI debe tener exactamente 8 dígitos.</small>
+                            </div>
+                        </div>
+
+                        <!-- Fila 2: Nombre Completo -->
+                        <div class="form-group">
+                            <label>Nombre Completo / Razón Social: <span class="required">*</span></label>
+                            <input type="text" id="nombre" placeholder="Nombres y Apellidos completos">
+                        </div>
+
+                        <!-- Fila 3: Dirección -->
+                        <div class="form-group">
+                            <label>Dirección: <span class="required">*</span></label>
+                            <input type="text" id="direccion" placeholder="Av. / Jr. / Calle, Nro, Distrito">
+                        </div>
+
+                        <!-- Fila 4: Teléfono y Email -->
+                        <div class="form-row">
+                            <div class="form-group" style="flex: 1;">
+                                <label>Celular / WhatsApp: <span class="required">*</span></label>
+                                <div class="input-group">
+                                    <span
+                                        style="padding: 10px; background: var(--border); border-radius: 8px 0 0 8px;">+51</span>
+                                    <input type="tel" id="telefono" placeholder="987654321" maxlength="9"
+                                        oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                                </div>
+                                <small>9 dígitos, sin espacios ni guiones.</small>
+                            </div>
+                            <div class="form-group" style="flex: 1;">
+                                <label>Correo Electrónico:</label>
+                                <input type="email" id="email" placeholder="cliente@correo.com">
+                                <small>Opcional, para envío de comprobantes.</small>
+                            </div>
+                        </div>
+
+                        <!-- Botón de Registro -->
+                        <div style="margin-top: 20px; display: flex; gap: 10px;">
+                            <button class="btn-primary" onclick="crearCliente()">💾 Registrar Cliente</button>
+                            <button class="btn-secondary" onclick="limpiarFormularioCliente()">🧹 Limpiar</button>
+                        </div>
+
+                        <div id="mensaje" class="mensaje" style="margin-top: 15px;"></div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3>📋 Listado de Clientes</h3>
+                        <button id="btn-filtro-morosos" class="btn-filter" onclick="toggleFiltroMorosos()">
+                            ⚠️ Ver Solo Morosos
+                        </button>
+                        <button class="btn-small" onclick="cargarClientes()" style="margin-left: 10px;">🔄
+                            Actualizar</button>
+                        <button class="btn-small" onclick="exportarClientesCSV()"
+                            style="margin-left: 10px; background: #27ae60;">📥 Exportar CSV</button>
+                    </div>
+                    <div class="card-body">
+                        <table class="tabla-clientes">
+                            <thead>
+                                <tr>
+                                    <th>Documento</th>
+                                    <th>Nombre / Razón Social</th>
+                                    <th>Tipo</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="listaClientes">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECCIÓN PRÉSTAMOS -->
+            <div id="seccion-prestamos" class="seccion" style="display:none;">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Nuevo Préstamo</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label>Buscar Cliente por Documento o Nombre:</label>
+                            <div class="input-group">
+                                <input type="text" id="buscar-cliente-doc" placeholder="Ingrese DNI, RUC o Nombre">
+                                <button class="btn-secondary" onclick="buscarClienteParaPrestamo()">🔍 Buscar</button>
+                            </div>
+                        </div>
+
+                        <div id="info-cliente"
+                            style="display:none; padding: 15px; background: #e8f5e9; border-radius: 5px; margin-bottom: 15px;">
+                            <p style="margin: 5px 0;"><strong>Cliente:</strong> <span id="cliente-nombre"></span></p>
+                            <p style="margin: 5px 0;"><strong>Documento:</strong> <span id="cliente-doc"></span></p>
+                        </div>
+
+                        <div id="form-prestamo" style="display:none;">
+                            <div class="form-group">
+                                <label>Monto Total del Préstamo:</label>
+                                <input type="number" id="monto-prestamo" placeholder="Ej: 5000" step="0.01" max="20000">
+                                <small>Máximo: S/ 20,000</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Número de Cuotas:</label>
+                                <input type="number" id="num-cuotas" placeholder="Ej: 12" min="1" max="24">
+                                <small>Máximo: 24 cuotas</small>
+                            </div>
+
+                            <button class="btn-secondary" style="width: 100%; padding: 12px;" onclick="crearPrestamo()">
+                                💰 Crear Préstamo
+                            </button>
+                        </div>
+
+                        <div id="mensaje-prestamo" class="mensaje"></div>
+                    </div>
+                </div>
+
+                <div class="card" id="detalle-prestamo-card" style="display:none;">
+                    <div class="card-header">
+                        <h3>Préstamo Activo</h3>
+                        <button class="btn-small" onclick="ocultarDetallePrestamo()">✕ Cerrar</button>
+                    </div>
+                    <div class="card-body">
+                        <div id="detalle-prestamo-info"></div>
+                        <h4 style="margin-top: 20px;">Cronograma de Cuotas</h4>
+                        <table class="tabla-clientes">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Vencimiento</th>
+                                    <th>Monto</th>
+                                    <th>Saldo</th>
+                                    <th>Estado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabla-cuotas"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- MODAL HISTORIAL DE PAGOS (NUEVO) -->
+                <div id="modal-historial"
+                    style="display:none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+                    <div
+                        style="background: white; width: 90%; max-width: 600px; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                        <div
+                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <h3 style="margin: 0;">📜 Historial de Pagos - Cuota <span id="historial-num-cuota"></span>
+                            </h3>
+                            <button onclick="cerrarHistorial()"
+                                style="background: none; border: none; font-size: 1.5em; cursor: pointer;">✕</button>
+                        </div>
+
+                        <div id="historial-lista" style="max-height: 400px; overflow-y: auto;">
+                            <!-- Aquí se cargarán los pagos -->
+                            <p style="text-align: center; color: #666;">Cargando...</p>
+                        </div>
+
+                        <div style="text-align: right; margin-top: 15px;">
+                            <button class="btn-secondary" onclick="cerrarHistorial()">Cerrar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODAL ESTADO DE CUENTA (NUEVO) -->
+            <div id="modal-estado-cuenta"
+                style="display:none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+                <div
+                    style="background: white; width: 95%; max-width: 800px; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-height: 90vh; overflow-y: auto;">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 2px solid #3498db; padding-bottom: 10px;">
+                        <h3 style="margin: 0;">📋 Estado de Cuenta - <span id="estado-cuenta-cliente">Cliente</span>
+                        </h3>
+                        <button onclick="cerrarEstadoCuenta()"
+                            style="background: none; border: none; font-size: 1.5em; cursor: pointer;">✕</button>
+                    </div>
+
+                    <div id="estado-cuenta-resumen"
+                        style="background: #e8f4fd; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                        <!-- Resumen dinámico -->
+                    </div>
+
+                    <table class="tabla-clientes" id="tabla-estado-cuenta">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Cuota #</th>
+                                <th>Monto</th>
+                                <th>Estado</th>
+                                <th>Detalle</th>
+                            </tr>
+                        </thead>
+                        <tbody id="estado-cuenta-lista">
+                            <!-- Filas dinámicas -->
+                        </tbody>
+                    </table>
+
+                    <div style="text-align: right; margin-top: 15px;">
+                        <button class="btn-secondary" onclick="cerrarEstadoCuenta()">Cerrar</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECCIÓN PAGOS / COBRANZA -->
+            <div id="seccion-pagos" class="seccion" style="display:none;">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>💳 Registrar Pago</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label>Buscar Cliente por DNI o Nombre:</label>
+                            <div class="input-group">
+                                <input type="text" id="buscar-pago-doc"
+                                    placeholder="Ingrese DNI, RUC o Nombre del Cliente">
+                                <button class="btn-secondary" onclick="buscarClienteParaPago()">🔍 Buscar
+                                    Préstamo</button>
+                            </div>
+                        </div>
+
+                        <div id="info-pago-cliente" style="display:none;">
+                            <div style="padding: 15px; background: #e3f2fd; border-radius: 5px; margin-bottom: 15px;">
+                                <p style="margin: 5px 0;"><strong>Cliente:</strong> <span
+                                        id="pago-cliente-nombre"></span></p>
+                                <p style="margin: 5px 0;"><strong>Préstamo:</strong> S/ <span
+                                        id="pago-monto-total"></span> en <span id="pago-num-cuotas"></span> cuotas</p>
+                                <button class="btn-small" style="background: #3498db; margin-top: 10px;"
+                                    onclick="verEstadoCuenta()">
+                                    📋 Ver Estado de Cuenta Completo
+                                </button>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Seleccionar Cuota:</label>
+                                <select id="select-cuota" onchange="seleccionarCuota()">
+                                    <option value="">-- Seleccione una cuota --</option>
+                                </select>
+                            </div>
+
+                            <div id="detalle-cuota" style="display:none;">
+                                <!-- DESGLOSE MEJORADO DEL PAGO -->
+                                <div
+                                    style="padding: 15px; background: #fff3e0; border-radius: 5px; margin-bottom: 15px;">
+                                    <h4 style="margin-top: 0; color: #f57c00;">💰 Desglose del Pago</h4>
+
+                                    <div
+                                        style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #ddd;">
+                                        <span><strong>Monto Capital:</strong></span>
+                                        <span id="cuota-monto-capital" style="font-size: 1.1em;">S/ 0.00</span>
+                                    </div>
+
+                                    <div id="linea-mora"
+                                        style="display: none; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #ddd;">
+                                        <span style="color: #e74c3c;"><strong>⚠️ Mora (1%):</strong></span>
+                                        <span id="cuota-mora-monto" style="color: #e74c3c; font-weight: bold;">S/
+                                            0.00</span>
+                                    </div>
+
+                                    <div
+                                        style="display: flex; justify-content: space-between; padding: 12px 0; background: #f9f9f9; margin: 10px -15px; padding-left: 15px; padding-right: 15px;">
+                                        <span style="font-size: 1.2em;"><strong>TOTAL A PAGAR:</strong></span>
+                                        <span id="cuota-total-pagar"
+                                            style="font-size: 1.3em; font-weight: bold; color: #27ae60;">S/ 0.00</span>
+                                    </div>
+
+                                    <div
+                                        style="margin-top: 10px; padding: 8px; background: #e8f5e9; border-radius: 4px;">
+                                        <p style="margin: 5px 0;"><strong>Saldo Pendiente:</strong> S/ <span
+                                                id="cuota-saldo"></span></p>
+                                        <p style="margin: 5px 0;"><strong>Vencimiento:</strong> <span
+                                                id="cuota-vencimiento"></span></p>
+                                        <p style="margin: 5px 0; font-weight: bold;" id="cuota-dias-atraso"></p>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Monto a Pagar:</label>
+                                    <input type="number" id="monto-pagar" placeholder="Ingrese monto" step="0.01"
+                                        onchange="actualizarRedondeo()">
+                                    <small id="mensaje-redondeo"
+                                        style="color: #f57c00; font-weight: bold; display: none;"></small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Medio de Pago:</label>
+                                    <select id="medio-pago" onchange="actualizarRedondeo()">
+                                        <option value="EFECTIVO">💵 Efectivo (con redondeo)</option>
+                                        <option value="YAPE">📱 Yape (cobro exacto)</option>
+                                        <option value="PLIN">📱 Plin (cobro exacto)</option>
+                                        <option value="TARJETA">💳 Tarjeta (cobro exacto)</option>
+                                        <option value="FLOW">🔵 Flow</option>
+                                    </select>
+                                </div>
+
+                                <button class="btn-secondary" style="width: 100%; padding: 12px;"
+                                    onclick="procesarPago()">
+                                    💳 Procesar Pago
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="mensaje-pago" class="mensaje"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECCIÓN CAJA -->
+            <div id="seccion-caja" class="seccion" style="display:none;">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>🏦 Control de Caja</h3>
+                    </div>
+                    <div class="card-body">
+
+                        <!-- Caja Cerrada -->
+                        <div id="caja-cerrada" style="text-align: center; padding: 20px;">
+                            <h3>🔴 La Caja está Cerrada</h3>
+                            <p>Debe abrir caja para poder procesar cobros.</p>
+
+                            <div class="form-group" style="max-width: 300px; margin: 20px auto;">
+                                <label>Monto Inicial (S/):</label>
+                                <input type="number" id="monto-inicial-caja" value="0.00">
+                            </div>
+
+                            <button class="btn-secondary" onclick="abrirCaja()">
+                                🔓 Abrir Caja
+                            </button>
+                        </div>
+
+                        <!-- Caja Abierta -->
+                        <div id="caja-abierta" style="display: none;">
+                            <div
+                                style="background: #e8f5e9; padding: 15px; border-radius: 8px; border-left: 5px solid #27ae60; margin-bottom: 20px;">
+                                <h3 style="margin-top:0; color: #2e7d32;">✅ Caja Abierta</h3>
+                                <p id="info-apertura"></p>
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                                <div class="card" style="background: #f8f9fa;">
+                                    <div class="card-body">
+                                        <h4 style="border-bottom: 2px solid #ddd; padding-bottom: 5px;">📊 Reporte de
+                                            Turno</h4>
+                                        <table style="width: 100%; border-collapse: separate; border-spacing: 0 5px;">
+                                            <tr>
+                                                <td><strong>Fondo Inicial:</strong></td>
+                                                <td style="text-align: right;">S/ <span id="resumen-inicial">0.00</span>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td colspan="2">
+                                                    <hr style="margin: 5px 0; border: 0; border-top: 1px dashed #ccc;">
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td colspan="2" style="color: #2c3e50;"><strong>INGRESOS (Ventas del
+                                                        Día)</strong></td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding-left: 10px;">💵 Efectivo Cobrado:</td>
+                                                <td style="text-align: right;">S/ <span
+                                                        id="resumen-efectivo">0.00</span></td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding-left: 10px;">📱 Yape/Plin (Banco):</td>
+                                                <td style="text-align: right;">S/ <span id="resumen-digital">0.00</span>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding-left: 10px;">💳 Tarjeta (Banco):</td>
+                                                <td style="text-align: right;">S/ <span id="resumen-tarjeta">0.00</span>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td colspan="2">
+                                                    <hr
+                                                        style="margin: 5px 0; border: 0; border-top: 2px solid #2c3e50;">
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #e67e22;"><strong>CUADRE DE EFECTIVO</strong></td>
+                                                <td></td>
+                                            </tr>
+                                            <tr>
+                                                <td style="font-size: 0.9em;">(Inicial + Efectivo Cobrado)</td>
+                                                <td></td>
+                                            </tr>
+                                            <tr style="background-color: #ffe0b2; font-weight: bold;">
+                                                <td style="padding: 5px;">💰 DEBE HABER EN CAJÓN:</td>
+                                                <td style="text-align: right; padding: 5px; font-size: 1.2em;">S/ <span
+                                                        id="resumen-total-cajon">0.00</span></td>
+                                            </tr>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <div class="card" style="background: #fff3e0;">
+                                    <div class="card-body">
+                                        <h4>Arqueo / Cierre</h4>
+                                        <div class="form-group">
+                                            <label>Monto Real en Efectivo (Contado):</label>
+                                            <input type="number" id="monto-real-cierre"
+                                                placeholder="¿Cuánto dinero tienes físicamente?">
+                                        </div>
+                                        <button class="btn-secondary" style="width: 100%; background: #e67e22;"
+                                            onclick="cerrarCaja()">
+                                            🔒 Cerrar Caja y Arquear
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="mensaje-caja" class="mensaje"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECCIÓN EMPLEADOS -->
+            <div id="seccion-empleados" class="seccion" style="display:none;">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>👥 Gestión de Empleados</h3>
+                        <button class="btn-small" onclick="cargarEmpleados()">🔄 Actualizar</button>
+                    </div>
+                    <div class="card-body">
+
+                        <!-- Formulario Nuevo Empleado -->
+                        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                            <h4>Nuevo Empleado</h4>
+                            <div class="input-group" style="margin-bottom: 10px;">
+                                <input type="text" id="emp-nombre" placeholder="Nombre completo">
+                                <input type="text" id="emp-usuario" placeholder="Usuario (Login)">
+                            </div>
+                            <div class="input-group">
+                                <input type="password" id="emp-password" placeholder="Contraseña">
+                                <select id="emp-rol">
+                                    <option value="CAJERO">Cajero</option>
+                                    <option value="ADMIN">Administrador</option>
+                                </select>
+                                <button class="btn-secondary" onclick="crearEmpleado()">➕ Crear</button>
+                            </div>
+                            <div id="mensaje-empleado" class="mensaje"></div>
+                        </div>
+
+                        <!-- Lista de Empleados -->
+                        <table class="tabla-clientes">
+                            <thead>
+                                <tr>
+                                    <th>Nombre</th>
+                                    <th>Usuario</th>
+                                    <th>Rol</th>
+                                    <th>Estado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="listaEmpleados"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECCIÓN CONFIGURACIÓN (SOLO ADMIN) -->
+            <div id="seccion-config" class="seccion" style="display:none;">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>⚙️ Configuración del Sistema</h3>
+                    </div>
+                    <div class="card-body">
+
+                        <!-- Parámetros de Mora -->
+                        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                            <h4>📊 Parámetros de Mora</h4>
+                            <div class="form-group">
+                                <label>Porcentaje de Mora Diaria (%):</label>
+                                <div class="input-group">
+                                    <input type="number" id="config-mora-porcentaje" step="0.01" min="0" max="100"
+                                        value="1" style="width: 100px;">
+                                    <span style="padding: 10px;">%</span>
+                                    <button class="btn-secondary" onclick="guardarConfigMora()">💾 Guardar</button>
+                                </div>
+                                <small style="color: #666;">Actualmente: La mora se calcula como [Saldo Pendiente] ×
+                                    [Porcentaje/100]</small>
+                            </div>
+                        </div>
+
+                        <!-- Info del Sistema -->
+                        <div style="background: #e8f4fd; padding: 20px; border-radius: 8px;">
+                            <h4>ℹ️ Información del Sistema</h4>
+                            <p><strong>Versión:</strong> 2.0 - AGILE Préstamos</p>
+                            <p><strong>Servidor:</strong> <span id="config-servidor-url">-</span></p>
+                            <p><strong>Usuario Actual:</strong> <span id="config-usuario-actual">-</span></p>
+                            <p><strong>Rol:</strong> <span id="config-rol-actual">-</span></p>
+                        </div>
+
+                    </div>
+
+                    <div id="mensaje-pago" class="mensaje"></div>
+                </div>
+            </div>
+    </div>
+
+    <!-- SECCIÓN CAJA -->
+    <div id="seccion-caja" class="seccion" style="display:none;">
+        <div class="card">
+            <div class="card-header">
+                <h3>🏦 Control de Caja</h3>
+            </div>
+            <div class="card-body">
+
+                <!-- Caja Cerrada -->
+                <div id="caja-cerrada" style="text-align: center; padding: 20px;">
+                    <h3>🔴 La Caja está Cerrada</h3>
+                    <p>Debe abrir caja para poder procesar cobros.</p>
+
+                    <div class="form-group" style="max-width: 300px; margin: 20px auto;">
+                        <label>Monto Inicial (S/):</label>
+                        <input type="number" id="monto-inicial-caja" value="0.00">
+                    </div>
+
+                    <button class="btn-secondary" onclick="abrirCaja()">
+                        🔓 Abrir Caja
+                    </button>
+                </div>
+
+                <!-- Caja Abierta -->
+                <div id="caja-abierta" style="display: none;">
+                    <div
+                        style="background: #e8f5e9; padding: 15px; border-radius: 8px; border-left: 5px solid #27ae60; margin-bottom: 20px;">
+                        <h3 style="margin-top:0; color: #2e7d32;">✅ Caja Abierta</h3>
+                        <p id="info-apertura"></p>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div class="card" style="background: #f8f9fa;">
+                            <div class="card-body">
+                                <h4 style="border-bottom: 2px solid #ddd; padding-bottom: 5px;">📊 Reporte de
+                                    Turno</h4>
+                                <table style="width: 100%; border-collapse: separate; border-spacing: 0 5px;">
+                                    <tr>
+                                        <td><strong>Fondo Inicial:</strong></td>
+                                        <td style="text-align: right;">S/ <span id="resumen-inicial">0.00</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="2">
+                                            <hr style="margin: 5px 0; border: 0; border-top: 1px dashed #ccc;">
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="2" style="color: #2c3e50;"><strong>INGRESOS (Ventas del
+                                                Día)</strong></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding-left: 10px;">💵 Efectivo Cobrado:</td>
+                                        <td style="text-align: right;">S/ <span id="resumen-efectivo">0.00</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding-left: 10px;">📱 Yape/Plin (Banco):</td>
+                                        <td style="text-align: right;">S/ <span id="resumen-digital">0.00</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding-left: 10px;">💳 Tarjeta (Banco):</td>
+                                        <td style="text-align: right;">S/ <span id="resumen-tarjeta">0.00</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="2">
+                                            <hr style="margin: 5px 0; border: 0; border-top: 2px solid #2c3e50;">
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="color: #e67e22;"><strong>CUADRE DE EFECTIVO</strong></td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="font-size: 0.9em;">(Inicial + Efectivo Cobrado)</td>
+                                        <td></td>
+                                    </tr>
+                                    <tr style="background-color: #ffe0b2; font-weight: bold;">
+                                        <td style="padding: 5px;">💰 DEBE HABER EN CAJÓN:</td>
+                                        <td style="text-align: right; padding: 5px; font-size: 1.2em;">S/ <span
+                                                id="resumen-total-cajon">0.00</span></td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="card" style="background: #fff3e0;">
+                            <div class="card-body">
+                                <h4>Arqueo / Cierre</h4>
+                                <div class="form-group">
+                                    <label>Monto Real en Efectivo (Contado):</label>
+                                    <input type="number" id="monto-real-cierre"
+                                        placeholder="¿Cuánto dinero tienes físicamente?">
+                                </div>
+                                <button class="btn-secondary" style="width: 100%; background: #e67e22;"
+                                    onclick="cerrarCaja()">
+                                    🔒 Cerrar Caja y Arquear
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="mensaje-caja" class="mensaje"></div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- SECCIÓN CONFIGURACIÓN (SOLO ADMIN) -->
+    <div id="seccion-config" class="seccion" style="display:none;">
+        <div class="card">
+            <div class="card-header">
+                <h3>⚙️ Configuración del Sistema</h3>
+            </div>
+            <div class="card-body">
+
+                <!-- Parámetros de Mora -->
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <h4>📊 Parámetros de Mora</h4>
+                    <div class="form-group">
+                        <label>Porcentaje de Mora Diaria (%):</label>
+                        <div class="input-group">
+                            <input type="number" id="config-mora-porcentaje" step="0.01" min="0" max="100" value="1"
+                                style="width: 100px;">
+                            <span style="padding: 10px;">%</span>
+                            <button class="btn-secondary" onclick="guardarConfigMora()">💾 Guardar</button>
+                        </div>
+                        <small style="color: #666;">Actualmente: La mora se calcula como [Saldo Pendiente] ×
+                            [Porcentaje/100]</small>
+                    </div>
+                </div>
+
+                <!-- Info del Sistema -->
+                <div style="background: #e8f4fd; padding: 20px; border-radius: 8px;">
+                    <h4>ℹ️ Información del Sistema</h4>
+                    <p><strong>Versión:</strong> 2.0 - AGILE Préstamos</p>
+                    <p><strong>Servidor:</strong> <span id="config-servidor-url">-</span></p>
+                    <p><strong>Usuario Actual:</strong> <span id="config-usuario-actual">-</span></p>
+                    <p><strong>Rol:</strong> <span id="config-rol-actual">-</span></p>
+                </div>
+
+                <div id="mensaje-config" class="mensaje" style="margin-top: 15px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECCIÓN CALENDARIO -->
+    <div id="seccion-calendario" class="seccion" style="display:none;">
+        <div class="card">
+            <div class="card-header">
+                <h3>📅 Calendario de Vencimientos</h3>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn-small" onclick="cambiarMesCalendario(-1)">◀ Anterior</button>
+                    <span id="calendario-mes-actual"
+                        style="padding: 8px 15px; background: rgba(255,255,255,0.2); border-radius: 8px;"></span>
+                    <button class="btn-small" onclick="cambiarMesCalendario(1)">Siguiente ▶</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- Leyenda del calendario -->
+                <div class="calendario-legend">
+                    <div class="legend-item">
+                        <span class="legend-dot hoy"></span>
+                        <span>Hoy</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-dot pendiente"></span>
+                        <span>Con vencimientos</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-dot vencido"></span>
+                        <span>Vencidos</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-dot pagado"></span>
+                        <span>Pagados</span>
+                    </div>
+                </div>
+
+                <div id="calendario-grid" class="calendario-container">
+                    <!-- Calendario será generado por JS -->
+                </div>
+
+
+                <!-- Lista de vencimientos del día seleccionado -->
+                <div id="vencimientos-dia" style="margin-top: 20px; display: none;">
+                    <h4 id="vencimientos-dia-titulo">Vencimientos del día</h4>
+                    <div id="lista-vencimientos-dia"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Enviar recordatorios -->
+        <div class="card" style="margin-top: 20px;">
+            <div class="card-header">
+                <h3>📧 Enviar Recordatorios</h3>
+            </div>
+            <div class="card-body">
+                <p style="margin-bottom: 15px;">Enviar recordatorio por WhatsApp a todos los clientes con cuotas
+                    vencidas:</p>
+                <button class="btn-secondary" onclick="enviarRecordatoriosMasivos()">
+                    📱 Enviar Recordatorios WhatsApp
+                </button>
+                <div id="mensaje-recordatorios" class="mensaje" style="margin-top: 15px;"></div>
+            </div>
+        </div>
+    </div>
+
+    </main>
+    </div>
+
+    <!-- Script Principal -->
+    <script src="App.js"></script>
+</body>
+
+</html>
