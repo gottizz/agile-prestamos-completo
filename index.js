@@ -1,49 +1,48 @@
-require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
-const app = express();
+const path = require('path'); // Importante para rutas de archivos
 
+// Importar rutas
 const clientesRoutes = require('./routes/clientes');
 const prestamosRoutes = require('./routes/prestamos');
 const pagosRoutes = require('./routes/pagos');
 const cajaRoutes = require('./routes/caja');
 const flowRoutes = require('./routes/flow');
+const mercadopagoRoutes = require('./routes/mercadopago');
 
+const app = express();
+
+// Middlewares
 app.use(cors());
 app.use(express.json());
-// Soporte para datos de formularios (necesario para el retorno de Flow)
 app.use(express.urlencoded({ extended: true }));
 
-// API Routes
+// 1. SERVIR ARCHIVOS ESTÁTICOS (TU FRONTEND)
+// Esto hace que la carpeta 'public' sea accesible desde el navegador
+app.use(express.static(path.join(__dirname, 'public')));
+
+// 2. RUTAS DE LA API
 app.use('/clientes', clientesRoutes);
 app.use('/prestamos', prestamosRoutes);
 app.use('/pagos', pagosRoutes);
 app.use('/caja', cajaRoutes);
 app.use('/flow', flowRoutes);
+app.use('/mercadopago', mercadopagoRoutes);
 
-// Health check para Render
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Server is running' });
-});
-
-// Manejar retorno de Flow (POST a la raíz cuando vuelve del pago)
-app.post('/', (req, res) => {
-  console.log('📩 Retorno de Flow recibido:', req.body);
-  // Redirigir al frontend con los parámetros
-  const token = req.body.token || '';
-  res.redirect(`/?pago=flow&token=${token}`);
-});
-
-// Servir archivos estáticos del frontend
-app.use(express.static(path.join(__dirname, 'fronted')));
-
-// Ruta catch-all: cualquier ruta no API sirve el frontend
+// 3. RUTA FALLBACK (PARA QUE SIEMPRE CARGUE TU HTML)
+// Si entran a una ruta que no es API, devuelve el index.html
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'fronted', 'Index.html'));
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => {
-  console.log(`API escuchando en puerto ${PORT}`);
-});
+// 4. EXPORTAR LA APP (REQUISITO DE VERCEL)
+// Vercel necesita que exportes 'app', no que uses app.listen directamente en producción
+module.exports = app;
+
+// Solo escuchar puerto si estamos en local (no en Vercel)
+if (require.main === module) {
+  const PORT = process.env.PORT || 4000;
+  app.listen(PORT, () => {
+    console.log(`Servidor corriendo en puerto ${PORT}`);
+  });
+}
